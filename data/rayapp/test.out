@@ -1,0 +1,13 @@
+<HTML>
+<HEAD><TITLE>Search application result</TITLE></HEAD><BODY>
+The result of search patt.
+<BR />
+	Search application result
+	patt
+	<UL><LI><A HREF="test.xml?id=364;num=1">adelton</A></LI> 
+	<LI><A HREF="test.xml?id=8234;num=2">kron</A></LI> 
+	<LI><A HREF="test.xml?id=923;num=3">Mirek</A></LI> 
+	</UL>
+
+</BODY>
+</HTML>

@@ -1,0 +1,34 @@
+
+		-------------------------------------
+			Apache::AxKit::RayApp
+		-------------------------------------
+
+This is a framework for running applications in mod_perl/AxKit
+environment. These application only return Perl data, nothing else.
+This Perl data is then inserted into structural XML description,
+forming XML output. This output is further processed by standard
+XML transformations (like XSLT) to deliver desired format, layout
+and design.
+
+So your Perl application only does the actions like fiddling with
+database records and it doesn't have to deal with HTML or XML markup.
+
+Installation:
+	Download the tar.gz, unpack it, change to the distribution
+	directory. Then do
+
+		perl Makefile.PL
+		make
+		make test
+		make install
+
+Available:
+	http://www.fi.muni.cz/~adelton/perl/ and in the future
+	from your favorite CPAN site in the authors/id/JANPAZ/
+	directory.
+	
+Copyright: (c) 2000--2001 Jan Pazdziora, adelton@fi.muni.cz.
+	All rights reserved. This library is free software;
+	you can redistribute it and/or modify it under the same
+	terms as Perl itself.
+

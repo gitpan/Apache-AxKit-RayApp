@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="ISO-8859-2"?>
+
+<?xml-stylesheet href="axkit.xslt" type="text/xsl"?>
+
+<data>
+	<title>Testing AxKit</title>
+	<para>Testing if <bold>AxKit</bold> works as promissed.</para>
+	<para>Here is small wine: [malé víno].</para>
+</data>
+

@@ -1,0 +1,13 @@
+
+0.44 Sat Jul 28 20:27:50 CEST 2001
+	Configuration of propagate, charset and ReturnXML added.
+
+0.43 Sat Jul 28 18:33:00 CEST 2001
+	Configuration of dbh setting added.
+
+0.42 Sat Jul 28 16:06:05 CEST 2001
+	Configuration of tests made more flexible.
+
+0.40 Fri Jul 27 18:29:38 CEST 2001
+	Packed 0.36 into working distribution.
+

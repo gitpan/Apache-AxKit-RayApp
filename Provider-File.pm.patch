@@ -1,0 +1,12 @@
+--- lib/Apache/AxKit/Provider/File.pm.orig	Sat Jul 28 14:44:55 2001
++++ lib/Apache/AxKit/Provider/File.pm	Thu Jul 26 17:37:36 2001
+@@ -48,8 +48,7 @@
+             
+             AxKit::Debug(8, "File Provider looking up file $p{file}");
+     
+-            $self->{apache} = $r->lookup_uri($p{file});
+-            $self->{file} = $self->{apache}->filename();
++            $self->{file} = $p{file};
+             
+             AxKit::Debug(8, "File Provider set filename to $self->{file}");
+         }

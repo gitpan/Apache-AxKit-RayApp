@@ -1,0 +1,11 @@
+# MIME type			Extension
+
+image/gif			gif
+image/jpeg			jpeg jpg jpe
+image/png			png
+image/tiff			tiff tif
+text/html			html
+text/plain			txt
+text/xml			xml dtd
+
+# This is a comment. I love comments.

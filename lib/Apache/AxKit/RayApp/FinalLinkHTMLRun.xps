@@ -1,0 +1,122 @@
+<HTML>
+<%
+
+use URI::Escape;
+use HTML::Entities;
+
+use Apache;
+my $r = Apache->request;
+my $apr = Apache::Request->new($r);
+
+my @PROPAGATE = qw! style !;
+
+my $propagate_conf = $r->dir_config('AxRayParamPropagate');
+if (defined $propagate_conf) {
+	push @PROPAGATE, split /,/, $propagate_conf;
+}
+
+$t->{'br'}{'pre'} = '<br />';
+$t->{'BR'}{'pre'} = '<BR />';
+
+$t->{'link'}{'testcode'} = sub {
+	my ($node, $t) = @_;
+	my $href;
+
+	my %propagate = map { ($_ => 0) } @PROPAGATE;
+
+	my $title;
+	my $atribs = '';
+	for my $atribnode (findnodes('@*', $node)) {
+		my $name = $atribnode->getName;
+		if ($name =~ /^no(.+)$/ and defined $propagate{$1}) {
+			$propagate{$1} = 1;
+		} elsif ($name eq 'title') {
+			$title = encode_entities(findvalue('.', $atribnode),
+				qq!\x00-\x1f<&>"!);
+		} elsif ($name eq 'href') {
+			$href = findvalue('.', $atribnode);
+		} elsif ($name =~ /^copy(.+)$/) {
+			$propagate{$1} = 0;
+		} elsif ($name =~ /^[A-Z]/) {
+			my $value = findvalue('.', $atribnode);
+			$name = uc($name);
+			$atribs .= qq! $name="$value"!;
+		}
+	}
+
+	if (not defined $href) {
+		$href = $r->uri;
+		$href =~ s!index\.[^/.]+$!!;
+	}
+
+	my $i = 0;
+	for my $node (findnodes('*', $node)) {
+		$href .= ( $i ? ';' : '?' );
+		$i++;
+		my $name = $node->getName;
+		if (exists $propagate{$name}) {
+			$propagate{$name} = 1;
+		}
+		my $value = findvalue('text()', $node);
+		$value = uri_escape($value, qq!\x00-\x1f<&> ;"!);
+		$href .= "$name=$value";
+	}
+
+	my $data = $r->pnotes('ismu_result');
+	$data = {} if not defined $data or $data eq '';
+
+	for my $key (grep { $propagate{$_} == 0 } keys %propagate) {
+		my $value = $data->{$key};
+		$value = $apr->param($key) unless defined $value;
+
+		if (defined $value) {
+			$href .= ( $i ? ';' : '?' );
+			$value = uri_escape($value, qq!\x00-\x1f<&> ;"!);
+			$href .= "$key=$value";
+			$i++;
+		}
+	}
+
+	$t->{'pre'} = qq!<A HREF="$href"$atribs>$title!;
+	$t->{'post'} = '</A>';
+	return -1;
+};
+
+$t->{'XFORM'}{'testcode'} = sub {
+	my ($node, $t) = @_;
+
+	$t->{'post'} = '';
+	for my $key (@PROPAGATE) {
+		if (defined(my $value = $apr->param($key))
+			and not findnodes(qq!INPUT[TYPE='HIDDEN' and NAME='$key']!, $node)->size) {
+			$t->{'post'} .=
+				qq!<INPUT TYPE="HIDDEN" NAME="$key" VALUE="$value"/>\n!;
+		}
+	}
+	$t->{'post'} .= "</FORM>";
+
+	my $atribs = join '', map { $_->toString } findnodes('@*', $node);
+
+	$t->{'pre'} = "<FORM$atribs>";
+	return 1;
+};
+
+$t->{'FORM'}{'testcode'} = sub {
+	my ($node, $t) = @_;
+
+	my $hidden = '';
+	for my $key (@PROPAGATE) {
+		if (defined(my $value = $apr->param($key))
+			and not findnodes(qq!INPUT[TYPE='HIDDEN' and NAME='$key']!, $node)->size) {
+			$hidden .= qq!<INPUT TYPE="HIDDEN" NAME="$key" VALUE="$value"/>\n!;
+		}
+	}
+	$t->{'postchildren'} .= $hidden;
+	$t->{'showtag'} = 1;
+	return 1;
+};
+
+print apply_templates('/page/*');
+
+%>
+</HTML>

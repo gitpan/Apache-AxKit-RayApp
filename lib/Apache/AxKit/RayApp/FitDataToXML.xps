@@ -1,0 +1,203 @@
+<%
+
+local $^W = 0;
+
+use Apache;
+my $r = Apache->request;
+my $data = $r->pnotes('rayapp_result');
+$data = {} if not defined $data or $data eq '';
+
+use Apache::AxKit::CharsetConv;
+
+my $charset = $data->{'!charset'} || $r->dir_config('AxRayAppCharset')
+	|| 'UTF-8';
+my $map = Apache::AxKit::CharsetConv->new($charset, 'UTF-8');
+
+my $convert = sub {
+	return '' if not defined $_[0] or $_[0] eq '';
+	my $data = $_[0];
+	$data =~ s/&/&amp;/g; $data =~ s/>/&gt;/g; $data =~ s/</&lt;/g;
+	### my $data = $map->tou($data);
+	my $data = $map->convert($data);
+	return $data;
+	### return "<![CDATA[$data]]>";
+	};
+
+sub parse_column_definition {
+	my $string = shift;
+	my $out = {};
+	my $i = 0;
+	while ($string =~ s/^\s*(\w+)//) {
+		$out->{$i}{'name'} = $1;
+		if ($string =~ s/^\[//) {
+			($out->{$i}{'sub'}, $string) = parse_column_definition($string);
+			if (not $string =~ s/^\s*\]//) {
+				die "Not found matching sub at `$string'";
+			}
+		}
+		$i++;
+	}
+	return ($out, $string);
+}
+
+sub parse_xml_definition {
+	my $node = shift;
+	my $out = {};
+	my $i = 0;
+	for my $n (findnodes('data|datalist', $node)) {
+		my $name = findvalue('@name', $n);
+		if (not defined $name) {
+			my $num = $i + 1;
+			$name = "column$num";
+		}
+		$out->{$i}{'name'} = $name;
+		my $type = findvalue('@type', $n);
+		$out->{$i}{'type'} = $type if $type ne '';
+		if ($n->getName eq 'datalist') {
+			$out->{$i}{'sub'} = parse_xml_definition($n);
+		}
+		$i++;
+	}
+	return $out;
+}
+
+sub interpolate_arrayref {
+	my ($arrayref, $definition, $indent) = @_;
+### use Data::Dumper; print STDERR Dumper @_;
+	my $out = '';
+	my $i = 1;
+	for my $row (@$arrayref) {
+		$out .= '  ' x $indent;
+		$out .= qq!<row num="$i">!;
+		$out .= interpolate_row($row, $definition, $indent);
+		$out .= "</row>\n";
+		$i++;
+	}
+	return $out;
+}
+
+sub interpolate_row {
+	my ($row, $definition, $indent) = @_;
+	my $out = '';
+	for (my $i = 0; $i < @$row; $i++) {
+		my $name;
+		if (defined $definition->{$i}) {
+			$name = $definition->{$i}{'name'};
+		} else {
+			my $num = $i + 1;
+			$name = "column$num";
+		}
+		my $value = $row->[$i];
+		if (ref $value eq 'ARRAY') {
+			$value = interpolate_arrayref($row->[$i], $definition->{$i}{'sub'}, $indent + 1);
+		} else {
+			if (defined $definition->{$i}{'type'}) {
+				if ($definition->{$i}{'type'} eq 'num') {
+					$value += 0;
+				}
+			}
+			if (defined $definition->{$i}{'maxlength'}) {
+				$value = substr($value, 0, $definition->{$i}{'maxlength'});
+			}
+			$value = &$convert("$value");
+			$value = "$value";
+		}
+		$out .= "<$name>$value</$name>";
+	}
+	return $out;
+}
+
+$t->{'datalist'}{'testcode'} = sub {
+	my ($node, $t) = @_;
+	my $name = findvalue('@name', $node);
+	my $definition;
+	if (defined $data->{$name.'!title'}) {
+		my $error;
+		($definition, $error) = parse_column_definition($data->{$name.'!title'});
+		if (not $error =~ /^\s*$/) {
+			die "Some garbage at the oed of definition `$error'";
+		}
+	} else {
+		$definition = parse_xml_definition($node);
+	}
+
+	my $rowid = 0;
+	$t->{'pre'} = qq!<$name>\n!;
+	$t->{'pre'} .= interpolate_arrayref($data->{$name}, $definition, 0);
+	$t->{'post'} = "</$name>\n";
+	$t->{'showtag'} = 0;
+	return -1;
+};
+
+$t->{'data'}{'testcode'} = sub {
+	my ($node, $t) = @_;
+	my $name = findvalue('@name', $node);
+	my $type = findvalue('@type', $node);
+
+	my $out = interpolate_row([ $data->{$name} ],
+		{ 0 => {'name' => $name, 'type' => $type}});
+	$t->{'pre'} = $out;
+	$t->{'post'} = '';
+	$t->{'showtag'} = 0;
+	return -1;
+};
+
+$t->{'textfield'}{'testcode'} = sub {
+	my ($node, $t) = @_;
+	my $name = findvalue('@name', $node);
+	my $out = '';
+	my $was_value = 0;
+	my @attributes = findnodes('@*', $node);
+	for my $node (@attributes) {
+		next if ($node->getName eq 'type');
+		if ($node->getName eq 'value'
+			and defined $data->{$name}) {
+			$out .= ' value="' . &$convert($data->{$name}) .  '"';
+			$was_value = 1;
+		} else {
+			$out .= $node->toString;
+		}
+	}
+	if (not $was_value) {
+		$out .= ' value="' . &$convert($data->{$name}) . '"';
+	}
+	$out = "$out";
+	$t->{'pre'} = qq!<textfield$out/>!;
+	$t->{'post'} = '';
+	$t->{'showtag'} = 0;
+	return -1;
+};
+
+$t->{'page'}{'testcode'} = sub {
+	my ($node, $t) = @_;
+	if (matches($node, '/page')) {
+		my $title = findnodes('title', $node);
+		if ($title->size == 0) {
+			my $value = &$convert($data->{'!title'});
+			$value = "$value";
+			$t->{'prechildren'} = "<title>$value</title>"
+				if $value ne '';
+			$t->{'showtag'} = 1;
+			return 1;
+		}
+	}
+	$t->{'showtag'} = 1;
+	return 1;
+};
+
+$t->{'title'}{'testcode'} = sub {
+	my ($node, $t) = @_;
+	if (matches($node, '/page/title') and defined $data->{'!title'}) {
+		my $value = &$convert($data->{'!title'});
+		$value = "$value";
+		$t->{'pre'} = "<title>$value</title>";
+		$t->{'post'} = '';
+		$t->{'showtag'} = 0;
+		return -1;
+	}
+	$t->{'showtag'} = 1;
+	return 1;
+};
+
+print apply_templates('/*');
+%>
